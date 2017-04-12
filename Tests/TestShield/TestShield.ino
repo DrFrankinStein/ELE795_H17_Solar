@@ -1,3 +1,5 @@
+#include "SPIDualLS7366R.hpp"
+
 #define DIRA 12
 #define DIRB 13
 #define PWMA 3
@@ -35,11 +37,13 @@ void setup()
   {
     Serial.println(sinus[i]);
   }*/
+
+  InitSPICounter(); 
 }
 
 void loop() 
 {
-  int pwm;
+  /*int pwm;
   bool dir;
   
   for (int i=0; i<SINUS_SEC*DELAY_HZ; i++)
@@ -53,5 +57,71 @@ void loop()
     digitalWrite(DIRA, dir?HIGH:HIGH);
     digitalWrite(DIRB, dir?HIGH:HIGH);
     delay(DELAY_MS);
+  }*/
+
+  /*struct SPICounterValue spiValue1;
+  bool dir = digitalRead(DIRA);
+
+  ReadSPICounter(CNTR, SS1, &spiValue1);
+
+  Serial.println(spiValue1.value);
+
+  if ((spiValue1.value > 100 && dir== HIGH) || (spiValue1.value < 0 && dir== LOW))
+  {
+      dir = !digitalRead(DIRA);
+      digitalWrite(DIRA, dir);
+  }
+
+  delay(100);*/
+
+  struct SPICounterValue spiValue1;
+  int positionMotor = 0, desiredPosition = 0;
+
+  if (Serial.available() > 0)
+  {
+    desiredPosition = Serial.parseInt();
+    ReadSPICounter(CNTR, SS1, &spiValue1);
+    positionMotor = spiValue1.value;
+
+    digitalWrite(DIRA, (desiredPosition-positionMotor > 0));
+    
+    while (abs(desiredPosition-positionMotor) >=1)
+    {
+      /*if (abs(desiredPosition-positionMotor) >=100)
+      {
+        analogWrite(PWMA,4000);
+      }
+
+      else if (abs(desiredPosition-positionMotor) >=20)
+      {
+        analogWrite(PWMA,3000);
+      }
+
+      else
+      {
+        analogWrite(PWMA,2000);
+      }*/
+
+      if (abs(desiredPosition-positionMotor) <=50)
+      {
+        analogWrite(PWMA,2000 + (4000 - 2000) * abs(desiredPosition-positionMotor) / 50);
+      }
+      else
+        analogWrite(PWMA,4000);
+        
+      ReadSPICounter(CNTR, SS1, &spiValue1);
+      positionMotor = spiValue1.value;
+      Serial.println(positionMotor);
+      delay(5);
+    }
+
+    analogWrite(PWMA, 0);
+
+    while (Serial.available() > 0)
+    {
+      Serial.read();
+    }
+
+    Serial.println(positionMotor);
   }
 }
