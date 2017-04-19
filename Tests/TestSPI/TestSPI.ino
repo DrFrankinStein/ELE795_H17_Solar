@@ -21,5 +21,5 @@ void loop()
   Serial.print(" ");
   Serial.println(spiValue2.value);
   
-  delay(1000);
+  delay(5);
 }

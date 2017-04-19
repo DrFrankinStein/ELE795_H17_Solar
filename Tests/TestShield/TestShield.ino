@@ -7,121 +7,122 @@
 #define BRKA 9
 #define BRKB 8  
 
-#define SINUS_SEC 10
-#define DELAY_HZ 200
-#define DELAY_MS 5
+#define DIRH DIRA
+#define DIRV DIRB
+#define PWMH PWMA
+#define PWMV PWMB
+#define BRKH BRKA
+#define BRKV BRKB
 
-float sinus[SINUS_SEC*DELAY_HZ];
+#define SSH SS1
+#define SSV SS2
+
+#define GEAR_RATIO 30
+#define ENCODER_STEP 10
+#define FULL_ROT 300
+#define SLOW_DOWN_THRESHOLD 50
+#define MAX_MOT_THRESHOLD 4000
+#define MIN_MOT_THRESHOLD 2000
+
+enum Motor {HOR_MOTOR, VER_MOTOR};
+
+void GoToPosition(int desiredPosition, enum Motor motor)
+{
+  struct SPICounterValue spiValue;
+  int positionMotor = 0;
+
+  int pwmId = (motor == HOR_MOTOR) ? PWMH : PWMV;
+  int dirId = (motor == HOR_MOTOR) ? DIRH : DIRV;
+  int brkId = (motor == HOR_MOTOR) ? BRKH : BRKV;
+  int slaveId = (motor == HOR_MOTOR) ? SSH : SSV;
+  
+  ReadSPICounter(CNTR, slaveId, &spiValue);
+  
+  positionMotor = spiValue.value;
+
+  digitalWrite(dirId, (desiredPosition-positionMotor > 0));
+  
+  while (abs(desiredPosition-positionMotor) >= 1)
+  {
+    if (abs(desiredPosition-positionMotor) <= SLOW_DOWN_THRESHOLD)
+      analogWrite(pwmId,MIN_MOT_THRESHOLD + (MAX_MOT_THRESHOLD - MIN_MOT_THRESHOLD) * abs(desiredPosition-positionMotor) / SLOW_DOWN_THRESHOLD);
+    else
+      analogWrite(pwmId,MAX_MOT_THRESHOLD);
+      
+    ReadSPICounter(CNTR, slaveId, &spiValue);
+    positionMotor = spiValue.value;
+    Serial.println(positionMotor);
+    delay(5);
+  }
+
+  analogWrite(pwmId, 0);
+}
+
+void InitMotor()
+{
+  pinMode(DIRH, OUTPUT);
+  pinMode(DIRV, OUTPUT);
+  pinMode(BRKH, OUTPUT);
+  pinMode(BRKV, OUTPUT);
+  digitalWrite(DIRH, HIGH);
+  digitalWrite(DIRV, HIGH);
+  analogWrite(PWMH, 0);
+  analogWrite(PWMV, 0);
+  digitalWrite(BRKH, LOW);
+  digitalWrite(BRKV, LOW);
+  analogWriteResolution(12);
+}
+
+/*void GoToPosition(int desiredPosition)
+{
+  struct SPICounterValue spiValue1;
+  int positionMotor = 0;
+  
+  ReadSPICounter(CNTR, SS2, &spiValue1);
+  positionMotor = spiValue1.value;
+
+  digitalWrite(DIRB, (desiredPosition-positionMotor > 0));
+  
+  while (abs(desiredPosition-positionMotor) >=1)
+  {
+    if (abs(desiredPosition-positionMotor) <=50)
+    {
+      analogWrite(PWMB,2000 + (4000 - 2000) * abs(desiredPosition-positionMotor) / 50);
+    }
+    else
+      analogWrite(PWMB,4000);
+      
+    ReadSPICounter(CNTR, SS2, &spiValue1);
+    positionMotor = spiValue1.value;
+    Serial.println(positionMotor);
+    delay(5);
+  }
+
+  analogWrite(PWMB, 0);
+}*/
 
 void setup() 
 {
-  for (int i=0; i<(SINUS_SEC*DELAY_HZ); i++)
-  {
-    sinus[i] = 4095.0*sin(((float)i*PI*2.0)/(SINUS_SEC*DELAY_HZ));
-  }
-  
-  pinMode(DIRA, OUTPUT);
-  pinMode(DIRB, OUTPUT);
-  pinMode(BRKA, OUTPUT);
-  pinMode(BRKB, OUTPUT);
-  digitalWrite(DIRA, HIGH);
-  digitalWrite(DIRB, HIGH);
-  analogWrite(PWMA, 0);
-  analogWrite(PWMB, 0);
-  digitalWrite(BRKA, LOW);
-  digitalWrite(BRKB, LOW);
-  analogWriteResolution(12);
+
   Serial.begin(9600);
   while (!Serial);
-  /*for (int i=0; i<(SINUS_SEC*DELAY_HZ); i++)
-  {
-    Serial.println(sinus[i]);
-  }*/
 
+  InitMotor();
   InitSPICounter(); 
 }
 
 void loop() 
 {
-  /*int pwm;
-  bool dir;
-  
-  for (int i=0; i<SINUS_SEC*DELAY_HZ; i++)
-  {
-    
-    dir = sinus[i] > 0;
-    pwm = (int)(dir ? sinus[i]: -sinus[i]);
-    
-    analogWrite(PWMA,pwm);
-    analogWrite(PWMB,pwm);
-    digitalWrite(DIRA, dir?HIGH:HIGH);
-    digitalWrite(DIRB, dir?HIGH:HIGH);
-    delay(DELAY_MS);
-  }*/
-
-  /*struct SPICounterValue spiValue1;
-  bool dir = digitalRead(DIRA);
-
-  ReadSPICounter(CNTR, SS1, &spiValue1);
-
-  Serial.println(spiValue1.value);
-
-  if ((spiValue1.value > 100 && dir== HIGH) || (spiValue1.value < 0 && dir== LOW))
-  {
-      dir = !digitalRead(DIRA);
-      digitalWrite(DIRA, dir);
-  }
-
-  delay(100);*/
-
-  struct SPICounterValue spiValue1;
-  int positionMotor = 0, desiredPosition = 0;
+  int desiredPosition = 0;
 
   if (Serial.available() > 0)
   {
     desiredPosition = Serial.parseInt();
-    ReadSPICounter(CNTR, SS1, &spiValue1);
-    positionMotor = spiValue1.value;
-
-    digitalWrite(DIRA, (desiredPosition-positionMotor > 0));
+    GoToPosition(desiredPosition, HOR_MOTOR);
     
-    while (abs(desiredPosition-positionMotor) >=1)
-    {
-      /*if (abs(desiredPosition-positionMotor) >=100)
-      {
-        analogWrite(PWMA,4000);
-      }
-
-      else if (abs(desiredPosition-positionMotor) >=20)
-      {
-        analogWrite(PWMA,3000);
-      }
-
-      else
-      {
-        analogWrite(PWMA,2000);
-      }*/
-
-      if (abs(desiredPosition-positionMotor) <=50)
-      {
-        analogWrite(PWMA,2000 + (4000 - 2000) * abs(desiredPosition-positionMotor) / 50);
-      }
-      else
-        analogWrite(PWMA,4000);
-        
-      ReadSPICounter(CNTR, SS1, &spiValue1);
-      positionMotor = spiValue1.value;
-      Serial.println(positionMotor);
-      delay(5);
-    }
-
-    analogWrite(PWMA, 0);
-
     while (Serial.available() > 0)
     {
       Serial.read();
     }
-
-    Serial.println(positionMotor);
   }
 }
