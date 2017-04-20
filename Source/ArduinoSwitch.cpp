@@ -1,5 +1,11 @@
 #include "ArduinoSwitch.hpp"
 
+void InitLimitSwitch()
+{
+  pinMode(LSWH, INPUT_PULLUP);
+  pinMode(LSWV, INPUT_PULLUP);
+}
+
 bool digitalReadSwitchUnbounced(int pin, int numTry)
 {
 	long lastDelayTime, currentTime;
@@ -37,3 +43,10 @@ bool digitalReadSwitchUnbounced(int pin, int numTry)
 
 	return pinValue;
 }
+
+bool digitalReadSwitchUnbounced(int pin)
+{
+  return digitalReadSwitchUnbounced(pin, BOUNCE_TRY);
+}
+
+
