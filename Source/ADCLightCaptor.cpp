@@ -1,5 +1,10 @@
 #include "ADCLightCaptor.hpp"
 
+void InitADC()
+{
+	analogReadResolution(12);
+}
+
 int CalculateADCSolarCaptor(int captor)
 {
 	return analogRead(captor);
@@ -31,5 +36,5 @@ void CalculateADCDifference(int* vertical, int* horizontal)
 	}
 	
 	*vertical = ((value[NW] + value[NE])-(value[SW] + value[SE]));
-	*horizontal = (((value[NW] + value[SW])-(value[NE] + value[SE]));
+	*horizontal = ((value[NW] + value[SW])-(value[NE] + value[SE]));
 }

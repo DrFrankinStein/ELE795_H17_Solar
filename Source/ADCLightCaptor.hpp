@@ -8,6 +8,7 @@
 #define SW_CAPTOR 9
 #define SE_CAPTOR 10
 
+void InitADC();
 int CalculateADCSolarCaptor(int captor);
 void CalculateADCDifference(int* vertical, int* horizontal);
 

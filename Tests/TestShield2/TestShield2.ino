@@ -1,5 +1,6 @@
 #include "SPIDualLS7366R.hpp"
 #include "ArduinoSwitch.hpp"
+#include "ADCLightCaptor.hpp"
 
 #define DIRA 12
 #define DIRB 13
@@ -24,6 +25,10 @@
 #define SLOW_DOWN_THRESHOLD 50
 #define MAX_MOT_THRESHOLD 4000
 #define MIN_MOT_THRESHOLD 3000
+
+#define CAPTOR_THRESHOLD 225
+#define RECALCULATE_MS 5
+#define SWITCH_AXE_MS 50
 
 enum Motor {HOR_MOTOR, VER_MOTOR};
 
@@ -91,7 +96,7 @@ void InitMotorsPosition()
   InitSPICounter();
   InitLimitSwitch(); 
 
-  for (int i = 0 ; i<2; i++)
+  /*for (int i = 0 ; i<2; i++)
   {
     Serial.print("CYCLE");
     Serial.println(i);
@@ -164,7 +169,75 @@ void InitMotorsPosition()
   }
 
   // Reset counter for motors
-  InitSPICounter(); 
+  InitSPICounter(); */
+}
+
+void AutomaticMode()
+{
+  int nw, ne, sw, se;
+  long lastAxeTime=0, lastAdjustTime=0, currentTime=0;
+
+  while(true)
+  {
+    lastAxeTime = millis();
+    while(true)
+    {
+      //Horizontal
+      currentTime = millis();
+      if (currentTime - lastAdjustTime > RECALCULATE_MS)
+      {
+        nw = CalculateADCSolarCaptor(NW_CAPTOR);
+        ne = CalculateADCSolarCaptor(NE_CAPTOR);
+        sw = CalculateADCSolarCaptor(SW_CAPTOR);
+        se = CalculateADCSolarCaptor(SE_CAPTOR);
+
+        digitalWrite(DIRH, (nw+sw-ne-se)>0);
+        analogWrite(PWMH,((nw+sw-ne-se)>CAPTOR_THRESHOLD? MAX_MOT_THRESHOLD: ((nw+sw-ne-se)<-CAPTOR_THRESHOLD? MAX_MOT_THRESHOLD : 0)));
+        lastAdjustTime = millis();
+      }
+      
+      if (currentTime - lastAxeTime > SWITCH_AXE_MS)
+      {
+        analogWrite(PWMH,0);
+        break;
+      }
+    }
+
+    lastAxeTime = millis();
+    while(true)
+    {
+      //Vertical
+      currentTime = millis();
+      if (currentTime - lastAdjustTime > RECALCULATE_MS)
+      {
+        nw = CalculateADCSolarCaptor(NW_CAPTOR);
+        ne = CalculateADCSolarCaptor(NE_CAPTOR);
+        sw = CalculateADCSolarCaptor(SW_CAPTOR);
+        se = CalculateADCSolarCaptor(SE_CAPTOR);
+
+        digitalWrite(DIRV, (se+sw-nw-ne)>0);
+        analogWrite(PWMV,((se+sw-nw-ne)>CAPTOR_THRESHOLD? MAX_MOT_THRESHOLD: ((se+sw-nw-ne)<-CAPTOR_THRESHOLD? MAX_MOT_THRESHOLD : 0)));
+        lastAdjustTime = millis();
+      }
+      
+      if (currentTime - lastAxeTime > SWITCH_AXE_MS)
+      {
+        analogWrite(PWMV,0);
+        break;
+      }
+    }
+
+    if (Serial.available()>0)
+    {
+      switch(Serial.read())
+      {
+        case 'M':
+        case 'm':
+          return;
+          break;
+      }
+    }
+  }
 }
 
 void setup() 
@@ -174,6 +247,9 @@ void setup()
   while (!Serial);
 
   InitMotorsPosition();
+  InitADC();
+
+  AutomaticMode();
 }
 
 void loop() 
@@ -185,9 +261,7 @@ void loop()
 
   if (Serial.available() > 0)
   {
-    car = Serial.read();
-
-    switch(car)
+    switch(Serial.read())
     {
       case 'H':
       case 'h':
@@ -201,15 +275,41 @@ void loop()
         moveMotor = true;
         break;
 
+
       case 'R':
       case 'r':
+        {
+          int nw,ne,sw,se;
+          nw = CalculateADCSolarCaptor(NW_CAPTOR);
+          ne = CalculateADCSolarCaptor(NE_CAPTOR);
+          sw = CalculateADCSolarCaptor(SW_CAPTOR);
+          se = CalculateADCSolarCaptor(SE_CAPTOR);
+          Serial.print(nw);
+          Serial.print(",");
+          Serial.print(ne);
+          Serial.print(",");
+          Serial.print(sw);
+          Serial.print(",");
+          Serial.println(se);
+        }
+        break;
+
+      case 'X':
+      case 'x':
         InitMotorsPosition();
         break;
+
+      case 'A':
+      case 'a':
+        AutomaticMode();
+        break;
+        
     }
 
     if (moveMotor)
     {
       desiredPosition = Serial.parseInt();
+      Serial.println(desiredPosition);
       GoToPosition(desiredPosition, motor);
     }
     
